@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const User = require('../models/User');
 const Shop = require('../models/Shop');
@@ -141,10 +142,31 @@ const seedData = async () => {
         ]);
         console.log('✅ Created products');
 
+        // Check if admin exists
+        const adminExists = await User.findOne({ email: 'admin@qareebe.com' });
+        if (!adminExists) {
+            await User.create({
+                name: 'Super Admin',
+                email: 'admin@qareebe.com',
+                phone: '+923000000000',
+                password: 'adminpassword123',
+                role: 'admin'
+            });
+            console.log('✅ Admin User Created');
+        } else {
+            // Ensure role is admin if it was changed
+            if (adminExists.role !== 'admin') {
+                adminExists.role = 'admin';
+                await adminExists.save();
+                console.log('✅ Admin Role Fixed');
+            }
+        }
+
         console.log('\n🎉 Database seeded successfully!');
         console.log('\n📝 Test Credentials:');
         console.log('Customer: +923001234567 / password123');
         console.log('Shop Owner: +923009876543 / password123');
+        console.log('Admin: +923000000000 / adminpassword123');
 
         process.exit(0);
     } catch (error) {

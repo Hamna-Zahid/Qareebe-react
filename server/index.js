@@ -13,11 +13,14 @@ app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static('uploads'));
 
 // Database Connection
 const connectDB = async () => {
     try {
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/qareebe', {
+        const validUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/qareebe';
+        console.log('🔌 Connecting to DB:', validUri.replace(/:([^:@]+)@/, ':****@')); // Log masked URI
+        await mongoose.connect(validUri, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
         });
@@ -36,6 +39,7 @@ app.use('/api/shops', require('./routes/shops'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/addresses', require('./routes/addresses'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Health Check
 app.get('/health', (req, res) => {

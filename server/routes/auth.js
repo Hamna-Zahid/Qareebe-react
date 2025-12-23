@@ -68,16 +68,22 @@ router.post('/login', [
 
     try {
         const { phone, password } = req.body;
+        console.log('Login Attempt:', { phone, passwordProvided: password });
 
         // Find user and include password
         const user = await User.findOne({ phone }).select('+password');
 
         if (!user) {
+            console.log('Login: User not found for phone:', phone);
             return res.status(401).json({ error: { message: 'Invalid credentials' } });
         }
 
+        console.log('Login: User found:', user._id, 'Hash:', user.password);
+
         // Check password
         const isMatch = await user.comparePassword(password);
+        console.log('Login: Password Match Result:', isMatch);
+
         if (!isMatch) {
             return res.status(401).json({ error: { message: 'Invalid credentials' } });
         }
@@ -99,6 +105,42 @@ router.post('/login', [
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: { message: 'Server error' } });
+    }
+});
+
+// @route   POST /api/auth/dev-login
+// @desc    Login as Dev User (Test)
+// @access  Public
+router.post('/dev-login', async (req, res) => {
+    try {
+        let user = await User.findOne({ email: 'test@qareebe.com' });
+
+        if (!user) {
+            user = await User.create({
+                name: 'Test Shop Owner',
+                phone: '00000000000',
+                email: 'test@qareebe.com',
+                password: 'devpassword123',
+                role: 'shop_owner'
+            });
+        }
+
+        const token = generateToken(user._id);
+
+        res.json({
+            success: true,
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                phone: user.phone,
+                email: user.email,
+                avatar: user.avatar
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: { message: 'Dev Login Failed' } });
     }
 });
 

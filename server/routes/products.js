@@ -1,6 +1,101 @@
 const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
+const Shop = require('../models/Shop');
+const { protect } = require('../middleware/auth');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configure Multer for image upload
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = 'uploads/';
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir);
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`);
+    }
+});
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 5000000 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+        const filetypes = /jpeg|jpg|png|webp/;
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = filetypes.test(file.mimetype);
+        if (mimetype && extname) {
+            return cb(null, true);
+        } else {
+            cb('Error: Images Only!');
+        }
+    }
+});
+
+// @route   POST /api/products
+// @desc    Create a new product (Protected, Shop Owner only)
+// @access  Private
+router.post('/', protect, upload.single('image'), async (req, res) => {
+    try {
+        console.log('Product upload request:', req.body);
+        console.log('File:', req.file);
+
+        if (!req.file) {
+            return res.status(400).json({ error: { message: 'Image is required' } });
+        }
+
+        // Find the shop owned by the user
+        const shop = await Shop.findOne({ ownerId: req.user._id });
+
+        if (!shop) {
+            // Remove uploaded file if shop not found
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: { message: 'Shop not found. Please create a shop first.' } });
+        }
+
+        // Parse sizes (if coming as stringified JSON or CSV)
+        let sizes = req.body.sizes;
+        if (typeof sizes === 'string') {
+            try {
+                sizes = JSON.parse(sizes);
+            } catch (e) {
+                sizes = sizes.split(',').map(s => s.trim());
+            }
+        }
+
+        const product = new Product({
+            shopId: shop._id,
+            name: req.body.name,
+            price: req.body.price,
+            originalPrice: req.body.originalPrice,
+            description: req.body.description,
+            category: req.body.category,
+            sizes: sizes,
+            stock: req.body.stock,
+            image: `/uploads/${req.file.filename}` // Store relative path
+        });
+
+        await product.save();
+
+        // Add product to shop's product list
+        shop.products.push(product._id);
+        await shop.save();
+
+        res.status(201).json({
+            success: true,
+            data: product
+        });
+    } catch (error) {
+        console.error('Create product error:', error);
+        // Clean up file on error
+        if (req.file) fs.unlinkSync(req.file.path);
+        res.status(500).json({ error: { message: 'Server error', details: error.message } });
+    }
+});
 
 // @route   GET /api/products
 // @desc    Get all products (with search)
