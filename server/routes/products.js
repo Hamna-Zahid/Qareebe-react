@@ -81,10 +81,6 @@ router.post('/', protect, upload.single('image'), async (req, res) => {
 
         await product.save();
 
-        // Add product to shop's product list
-        shop.products.push(product._id);
-        await shop.save();
-
         res.status(201).json({
             success: true,
             data: product
@@ -93,6 +89,11 @@ router.post('/', protect, upload.single('image'), async (req, res) => {
         console.error('Create product error:', error);
         // Clean up file on error
         if (req.file) fs.unlinkSync(req.file.path);
+
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ error: { message: 'Validation Error', details: error.message } });
+        }
+
         res.status(500).json({ error: { message: 'Server error', details: error.message } });
     }
 });

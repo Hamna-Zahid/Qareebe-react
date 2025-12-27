@@ -1,99 +1,50 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api';
+import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
 
-// Helper function to make API calls
-const apiCall = async (endpoint, options = {}, isMultipart = false) => {
-    const token = localStorage.getItem('token');
-    console.log('API Call:', endpoint, 'Token:', token ? 'Present' : 'Missing');
+// Use same backend as consumer app
+const BASE_URL = 'http://192.168.1.11:5000/api';
 
-    const headers = {};
+const api = axios.create({
+    baseURL: BASE_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
 
-    // Only add Authorization if token exists and is valid
-    if (token && token !== 'null' && token !== 'undefined') {
-        headers.Authorization = `Bearer ${token}`;
-    }
+api.interceptors.request.use(
+    async (config) => {
+        const token = await SecureStore.getItemAsync('merchant_token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
 
-    // Add other headers
-    Object.assign(headers, options.headers);
-
-    // Only set Content-Type to application/json if NOT multipart
-    if (!isMultipart) {
-        headers['Content-Type'] = 'application/json';
-    }
-
-    const config = {
-        ...options,
-        headers,
-    };
-
-
-    const response = await fetch(`${API_URL}${endpoint}`, config);
-    const data = await response.json();
-
-    console.log('API Response:', { endpoint, status: response.status, data });
-
-    if (!response.ok) {
-        console.error('API Error Response:', data);
-        console.error('Request was:', { endpoint, headers: config.headers });
-        throw new Error(data?.error?.message || data?.message || 'API request failed');
-    }
-
-    return data;
+// Auth methods
+export const authApi = {
+    login: (phone, password) => api.post('/auth/login', { phone, password }),
+    signup: (userData) => api.post('/auth/signup', userData),
+    getMe: () => api.get('/auth/me'),
 };
 
-const api = {
-    // Auth endpoints
-    auth: {
-        signup: (userData) => apiCall('/auth/signup', {
-            method: 'POST',
-            body: JSON.stringify(userData),
-        }),
-        login: (credentials) => apiCall('/auth/login', {
-            method: 'POST',
-            body: JSON.stringify(credentials),
-        }),
-        getMe: () => apiCall('/auth/me'),
-    },
+// Merchant specific methods
+export const merchantApi = {
+    getShop: () => api.get('/shops/me'),
+    updateShop: (data) => api.put('/shops/me', data),
+    getOrders: () => api.get('/orders/my-orders'),
+    updateOrderStatus: (orderId, status) => api.put(`/orders/${orderId}/status`, { status }),
+};
 
-    // Shop Owner endpoints
-    shopOwner: {
-        createShop: (shopData) => apiCall('/shops', {
-            method: 'POST',
-            body: shopData, // shopData is FormData in Onboarding, handled by 'isMultipart' arg?
-            // Wait, onboarding calls createShop(data). ShopOnboarding3 sends FormData.
-            // apiCall helper: createShop: (shopData) => apiCall('/shops', { ... }, true) needs isMultipart=true if FormData!
-        }, true), // Fixed: Added isMultipart=true for FormData
-
-        getShop: () => apiCall('/shops/me'),
-
-        updateShop: (shopData) => apiCall('/shops/me', {
-            method: 'PUT',
-            body: JSON.stringify(shopData),
-        }),
-
-        getOrders: () => apiCall('/orders/my-orders'), // Assuming orders.js has this
-
-        updateOrderStatus: (orderId, status) => apiCall(`/orders/${orderId}/status`, {
-            method: 'PUT',
-            body: JSON.stringify({ status }),
-        }),
-
-        // Use standard product endpoints for now
-        getProducts: (shopId) => apiCall(`/products?shopId=${shopId || ''}`),
-
-        createProduct: (productData) => apiCall('/products', {
-            method: 'POST',
-            body: productData,
-        }, true), // isMultipart = true for FormData
-
-        updateProduct: (productId, productData) => apiCall(`/products/${productId}`, {
-            method: 'PUT',
-            body: JSON.stringify(productData),
-        }),
-
-        deleteProduct: (productId) => apiCall(`/products/${productId}`, {
-            method: 'DELETE',
-        }),
-    },
+// Product management for merchant
+export const productApi = {
+    getProducts: (shopId) => api.get(`/products?shopId=${shopId || ''}`),
+    createProduct: (data) => api.post('/products', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    updateProduct: (id, data) => api.put(`/products/${id}`, data),
+    deleteProduct: (id) => api.delete(`/products/${id}`),
 };
 
 export default api;

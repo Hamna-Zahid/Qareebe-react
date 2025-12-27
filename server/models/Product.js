@@ -20,6 +20,10 @@ const productSchema = new mongoose.Schema({
         type: Number,
         min: 0
     },
+    description: {
+        type: String,
+        required: true
+    },
     image: {
         type: String,
         required: true
@@ -35,8 +39,8 @@ const productSchema = new mongoose.Schema({
     },
     category: {
         type: String,
-        enum: ['women', 'men', 'kids', 'accessories'],
-        default: 'women'
+        enum: ['Women', 'Men', 'Kids', 'Accessories', 'Beauty'],
+        default: 'Women'
     },
     isActive: {
         type: Boolean,

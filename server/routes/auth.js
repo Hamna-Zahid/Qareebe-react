@@ -14,11 +14,12 @@ router.post('/signup', [
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        const message = errors.array()[0].msg;
+        return res.status(400).json({ error: { message } });
     }
 
     try {
-        const { name, phone, email, password } = req.body;
+        const { name, phone, email, password, role } = req.body;
 
         // Check if user exists
         let user = await User.findOne({ phone });
@@ -31,7 +32,8 @@ router.post('/signup', [
             name,
             phone,
             email,
-            password
+            password,
+            role: role || 'customer'
         });
 
         // Generate token
@@ -63,7 +65,8 @@ router.post('/login', [
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        const message = errors.array()[0].msg;
+        return res.status(400).json({ error: { message } });
     }
 
     try {

@@ -33,6 +33,14 @@ const shopSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    description: {
+        type: String,
+        trim: true
+    },
+    categories: [{
+        type: String,
+        trim: true
+    }],
     isActive: {
         type: Boolean,
         default: true

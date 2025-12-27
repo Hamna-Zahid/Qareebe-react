@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User Profile Rules
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Order Rules
+    match /orders/{orderId} {
+      // Customers can read their own orders, Shops can read orders assigned to them
+      allow read: if request.auth != null && (
+        resource.data.customerId == request.auth.uid || 
+        resource.data.shopId == request.auth.uid
+      );
+      
+      // Customers can create orders
+      allow create: if request.auth != null && 
+        request.resource.data.status == 'pending' &&
+        request.resource.data.customerId == request.auth.uid;
+      
+      // Shops can update order status (Accept/Reject)
+      allow update: if request.auth != null && 
+        resource.data.shopId == request.auth.uid &&
+        (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected');
+        
+      // System/Cloud Functions can update anything (handled via Admin SDK usually, but rules still apply if using client)
+    }
+
+    // Product Rules
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Merchant';
+    }
+  }
+}
